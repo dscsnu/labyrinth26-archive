@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Labyrinth 26 replay</title>
+<style>
+  @font-face { font-family: "kongtext"; src: url(assets/kongtext.ttf); }
+  @font-face { font-family: "superfly"; src: url(assets/superfly.ttf); }
+  html, body { margin: 0; background: #0b0d12; color: #eee; font-family: kongtext, monospace; }
+  /* The stage is 1920 x 1080, scaled to fit the window (fitStage()). */
+  #frame { position: relative; margin: 0 auto; overflow: hidden; }
+  #wrap { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+  #stage { display: block; width: 1920px; height: 1080px; image-rendering: pixelated; }
+
+  /* The followed team's phone (phone.js): /play's look, at 390 x 844. */
+  #phone { position: absolute; left: 497px; top: 92px; width: 414px; font-family: kongtext, monospace; }
+  #phone[hidden] { display: none; }
+  #phone .screen { position: relative; width: 390px; height: 844px; overflow: hidden; border: 12px solid #05060a; border-radius: 44px; background: #000; box-shadow: 0 0 0 2px #2a3040, 0 30px 60px rgba(0,0,0,.6); }
+  /* Under the phone: whose it is (a chip, as the Following bar has) and Close. */
+  #phone .caption { display: flex; align-items: center; gap: 10px; margin: 12px 0 0; padding: 0 4px; color: #6b7286; font-size: 12px; }
+  #phone .caption .chip { display: inline-flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 10px; border: 2px solid var(--c); border-radius: 4px; background: color-mix(in srgb, var(--c) 18%, #0b0d12); color: #f3f3f3; font-size: 14px; }
+  #phone .caption .chip i { flex: none; width: 12px; height: 12px; background: var(--c); }
+  #phone .caption .name { overflow: hidden; white-space: nowrap; }
+  #phone .caption .label, #phone .caption button { flex: none; }
+  #phone .caption button { margin-left: auto; padding: 8px 14px; background: #1b1f2a; border: 1px solid #333a4a; border-radius: 4px; color: #eee; font: inherit; font-size: 13px; cursor: pointer; }
+  #phone [hidden] { display: none !important; }
+  #phone img { image-rendering: pixelated; }
+  #phone .px { box-shadow: 0 -4px 0 0 #1a1423, 0 4px 0 0 #1a1423, -4px 0 0 0 #1a1423, 4px 0 0 0 #1a1423, inset 0 4px 0 0 rgb(255 255 255 / .15), inset 0 -4px 0 0 rgb(0 0 0 / .3); }
+  #phone .outline { text-shadow: 2px 0 0 #1a1423, -2px 0 0 #1a1423, 0 2px 0 #1a1423, 0 -2px 0 #1a1423, 2px 2px 0 #1a1423, -2px -2px 0 #1a1423, 2px -2px 0 #1a1423, -2px 2px 0 #1a1423; }
+  #phone .top { position: absolute; inset: 0 0 auto 0; height: 211px; box-sizing: border-box; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; border-bottom: 4px solid #000; color: #fff; isolation: isolate; overflow: hidden; }
+  #phone .tiles { position: absolute; inset: 0; z-index: -1; overflow: hidden; }
+  #phone .checks { position: absolute; top: 50%; left: 50%; width: 1700px; height: 1700px; transform: translate(-50%, -50%) rotate(45deg); }
+  #phone .light { position: absolute; inset: 0; background: radial-gradient(ellipse at 85% 5%, rgb(255 255 255 / .3), transparent 55%), linear-gradient(to top right, rgb(0 0 40 / .5), transparent 65%); }
+  #phone .row { display: flex; justify-content: space-between; align-items: center; }
+  #phone .back { background: rgb(26 20 35 / .8); padding: 4px 8px; font-size: 16px; line-height: 24px; }
+  #phone .health { display: flex; align-items: center; gap: 8px; font-size: 18px; line-height: 32px; }
+  #phone .health img { width: 32px; height: 32px; }
+  #phone .health.blink { animation: blink .25s steps(1) 6; }
+  @keyframes blink { 50% { opacity: 0; } }
+  #phone .bossrow { flex: 1; min-height: 0; display: flex; align-items: center; gap: 16px; }
+  #phone .boss { height: 100%; width: auto; }
+  #phone .boss.hurt { filter: brightness(2.5) saturate(0); transform: translateX(3px); }
+  #phone .bossinfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  #phone .bossname { margin: 0; padding: 4px 0; font-family: superfly, kongtext; line-height: 1; color: #3cc8f4; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 2px 0 0 #1a1423, -2px 0 0 #1a1423, 0 2px 0 #1a1423, 0 -2px 0 #1a1423, 2px 2px 0 #1a1423, -2px -2px 0 #1a1423, 4px 4px 0 #1a1423; }
+  #phone .bar { position: relative; margin: 0 4px; height: 16px; background: #1a1423; }
+  #phone .bar .trail { position: absolute; inset: 0 auto 0 0; background: #fff; transition: width .7s .3s; }
+  #phone .bar .fill { position: absolute; inset: 0 auto 0 0; background: #ff2f86; transition: width .5s; }
+  #phone .hptext { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 8px; }
+  #phone .next { position: absolute; right: 0; bottom: 0; margin: 0; padding: 0 8px; font-size: 8px; line-height: 16px; text-transform: uppercase; }
+  #phone .done { margin: auto; text-transform: uppercase; font-size: 12px; }
+  #phone .map { position: absolute; inset: 211px 0 0 0; overflow: hidden; background: #2e7d32; }
+  #phone .map canvas { display: block; }
+  #phone .ko { position: absolute; inset: 0 0 auto 0; z-index: 2; margin: 0; padding: 8px 16px; border-bottom: 4px solid #000; background: #c0453a; color: #fff; text-align: center; font-size: 8px; line-height: 16px; text-transform: uppercase; }
+  #phone .powerups { position: absolute; left: 16px; top: 16px; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+  #phone .powerups.down { top: 64px; }
+  #phone .powerups img { width: 48px; height: 48px; }
+  #phone .run { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  #phone .left { background: #3cc8f4; color: #1a1423; padding: 0 4px; font-size: 8px; line-height: 16px; text-transform: uppercase; }
+  #phone .qr { position: absolute; left: 16px; bottom: 16px; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; background: #fbf8ef; }
+  #phone .qr svg { width: 40px; height: 40px; }
+  #phone .controls { position: absolute; right: 16px; bottom: 16px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  #phone .zoom { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: #fbf8ef; }
+  #phone .zoom svg { width: 16px; height: 16px; }
+  #phone .book, #phone .book img, #phone .sel { display: block; width: 64px; height: 64px; }
+  #phone .sel { box-sizing: border-box; padding: 4px; background: #3cc8f4; }
+  #phone .sel svg { width: 100%; height: 100%; }
+  #phone .toast { position: absolute; left: 16px; right: 16px; z-index: 50; margin: 0; padding: 8px 12px; background: #1a1423; text-align: center; font-size: 8px; line-height: 16px; text-transform: uppercase; }
+  #phone .popup { position: absolute; top: 50%; left: 50%; z-index: 40; width: 224px; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 12px; background: #fff; color: #1a1423; text-align: center; font-size: 8px; line-height: 16px; text-transform: uppercase; }
+  #phone .popup p { margin: 0; }
+  #phone .popup .title { font-size: 16px; line-height: 24px; }
+  #phone .attackpop { gap: 12px; }
+  #phone .atkboss { height: 96px; }
+  #phone .health.big { color: #fff; }
+  #phone .gold { display: block; width: 100%; box-sizing: border-box; padding: 8px 12px; background: #b8963e; color: #fff; text-shadow: 2px 0 0 #1a1423, -2px 0 0 #1a1423, 0 2px 0 #1a1423, 0 -2px 0 #1a1423; }
+  #phone .dim { position: absolute; inset: 0; z-index: 45; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgb(26 20 35 / .7); font-size: 8px; line-height: 16px; text-transform: uppercase; }
+  #phone .card { display: flex; flex-direction: column; gap: 12px; width: 100%; box-sizing: border-box; padding: 16px; background: #fbf8ef; color: #1a1423; }
+  #phone .qhead { display: flex; justify-content: space-between; margin: 0; }
+  #phone .qq { margin: 0; font-size: 16px; line-height: 24px; text-transform: none; font-weight: normal; }
+  #phone .qopts { display: flex; flex-direction: column; gap: 8px; }
+  #phone .opt { padding: 8px 12px; color: #fbf8ef; text-transform: none; }
+  #phone .qnote { margin: 0; }
+  #controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: center; min-height: 44px; padding: 4px 8px; box-sizing: border-box; font-size: 11px; }
+  #controls button:disabled { opacity: .4; cursor: default; }
+  #controls button, #controls select { font: inherit; color: #eee; background: #1b1f2a; border: 1px solid #333a4a; border-radius: 4px; padding: 4px 10px; cursor: pointer; }
+  #scrub { width: min(50vw, 900px); min-width: 120px; accent-color: #f9f3a3; }
+
+  /* Phones and small tablets (body.mobile, set by layout()): the canvas draws
+     the map alone, the leaderboard and feed are HTML below it (or beside it
+     in landscape), and the phone view fills the screen. */
+  #panel, #scrim { display: none; }
+  body.mobile { -webkit-tap-highlight-color: transparent; }
+  body.mobile #frame { width: auto !important; height: auto !important; }
+  body.mobile #wrap { position: static; width: auto; height: auto; transform: none !important; }
+  body.mobile #stage { width: min(100%, 60vh); height: auto; margin: 0 auto; } /* at most 70% of the height: the map is 937 x 1080 */
+  body.mobile #panel { display: block; padding: 12px 16px 20px; font-size: 10px; line-height: 1.6; }
+  body.mobile #controls { position: sticky; bottom: 0; z-index: 5; gap: 8px; padding: 8px 16px calc(8px + env(safe-area-inset-bottom)); background: #0b0d12; border-top: 1px solid #2a3040; }
+  body.mobile #controls button, body.mobile #controls select { padding: 10px 12px; }
+  body.mobile #scrub { order: 9; flex: 1 1 100%; width: auto; height: 28px; margin: 0; }
+  body.mobile #phone { position: fixed; left: 50%; top: 50%; z-index: 20; transform: translate(-50%, -50%) scale(var(--ps, 1)); }
+  body.mobile #scrim:not([hidden]) { display: block; position: fixed; inset: 0; z-index: 19; background: rgb(5 6 10 / .95); }
+  body.mobile.phoneopen { overflow: hidden; }
+  @media (orientation: landscape) {
+    body.mobile { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; height: 100dvh; overflow: hidden; }
+    body.mobile #frame, body.mobile #wrap { height: 100% !important; }
+    body.mobile #stage { width: auto; height: 100%; }
+    body.mobile #panel { overflow-y: auto; padding-bottom: 0; } /* the feed pads instead, so the pinned bar sits on the edge */
+    body.mobile #feedlist { padding-bottom: 20px; }
+    body.mobile #controls { grid-column: 1 / -1; flex-wrap: nowrap; padding-top: 4px; padding-bottom: calc(4px + env(safe-area-inset-bottom)); }
+    body.mobile #controls button, body.mobile #controls select { padding: 6px 10px; }
+    body.mobile #scrub { order: 0; flex: 1 1 auto; min-width: 80px; }
+  }
+  #panel header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; margin-bottom: 12px; }
+  #panel h1 { margin: 0; font: 24px/1 superfly, kongtext; color: #f9f3a3; }
+  #panel .sub { display: block; color: #8a90a2; font-size: 9px; white-space: nowrap; }
+  #pclock { display: block; font-size: 16px; text-align: right; white-space: nowrap; }
+  #pmeta { text-align: right; }
+  #lb { display: flex; flex-direction: column; gap: 4px; }
+  #lb .row { display: grid; grid-template-columns: 20px 12px minmax(0, 1fr) auto; grid-template-areas: "rank sw name hp" ". . boss boss"; gap: 6px 8px; align-items: center; width: 100%; box-sizing: border-box; padding: 8px; background: #141824; border: 2px solid transparent; border-radius: 4px; color: #f3f3f3; font: inherit; text-align: left; cursor: pointer; }
+  #lb .row:nth-child(even) { background: #10131b; }
+  #lb .row.focus { border-color: var(--c); }
+  #lb .row.dim { opacity: .35; }
+  #lb .row.hurt { background: #3a1820; }
+  #lb .rank { grid-area: rank; color: #8a90a2; }
+  #lb .row:nth-child(-n+3) .rank { color: #f9f3a3; }
+  #lb .sw { grid-area: sw; width: 12px; height: 12px; background: var(--c); }
+  #lb .name { grid-area: name; overflow: hidden; font-size: 11px; white-space: nowrap; }
+  #lb .row.out .name { color: #7a7f8c; }
+  #lb .hp { grid-area: hp; display: flex; gap: 2px; align-items: center; }
+  #lb .hp i { width: 6px; height: 10px; background: #2a3040; }
+  #lb .hp i.on { background: #ff6b81; }
+  #lb .ko { padding: 0 6px; background: #e84855; color: #fff; }
+  #lb .boss { grid-area: boss; display: flex; align-items: center; gap: 8px; min-width: 0; }
+  #lb .pips { display: flex; gap: 3px; }
+  #lb .pips i { width: 8px; height: 8px; background: #2a3040; }
+  #lb .pips i.on { background: var(--c); }
+  #lb .boss img { width: 16px; height: 20px; image-rendering: pixelated; }
+  #lb .bname { flex: 1; min-width: 0; overflow: hidden; color: #c9ccd6; font-size: 9px; white-space: nowrap; text-overflow: ellipsis; }
+  #lb .bar { flex: none; width: 56px; height: 6px; background: #2a3040; }
+  #lb .bar b { display: block; height: 100%; background: #e84855; }
+  #lb .fin { flex: 1; color: #7fe07f; }
+  #lb .pw img { width: 16px; height: 16px; }
+  #feedhead { display: flex; align-items: center; gap: 8px; min-height: 32px; margin: 18px 0 6px; color: #6b7286; }
+  /* While a team is followed, its bar stays on screen: pinned above the
+     controls (--ch, their height) or at the top once scrolled past. */
+  #feedhead.on { position: sticky; top: 0; bottom: var(--ch, 0px); z-index: 4; margin-inline: -16px; padding: 8px 16px; background: #0b0d12; border-block: 1px solid #2a3040; }
+  @media (orientation: landscape) { #feedhead.on { bottom: 0; } }
+  #feedhead .chip { display: inline-flex; align-items: center; gap: 6px; min-width: 0; padding: 4px 8px; border: 2px solid var(--c); border-radius: 4px; background: color-mix(in srgb, var(--c) 18%, transparent); color: #f3f3f3; font-size: 11px; }
+  #feedhead .chip i { flex: none; width: 10px; height: 10px; background: var(--c); }
+  #feedhead > span:first-child, #feedhead .all { flex: none; }
+  #feedhead .name { overflow: hidden; white-space: nowrap; }
+  #feedhead .all { margin-left: auto; padding: 6px 10px; background: #1b1f2a; border: 1px solid #333a4a; border-radius: 4px; color: #eee; font: inherit; cursor: pointer; }
+  #feedlist { margin: 0; padding: 0; list-style: none; }
+  #feedlist li { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; padding: 6px 0; border-bottom: 1px solid #1b1f2a; overflow-wrap: anywhere; }
+  #feedlist time { color: #6b7286; }
+  #feedlist .who { display: inline-flex; gap: 6px; align-items: center; margin-right: 8px; color: #f3f3f3; }
+  #feedlist .who i { width: 10px; height: 10px; background: var(--c); }
+  #feedlist .good { color: #7fe07f; } #feedlist .bad { color: #ff6b6b; } #feedlist .cast { color: #c9ccd6; }
+  #feedlist .info { color: #8a90a2; } #feedlist .quiz { color: #f9f3a3; }
+</style>
+</head>
+<body>
+<div id="frame"><div id="wrap"><canvas id="stage" width="1920" height="1080"></canvas><div id="phone" hidden></div></div></div>
+<div id="scrim" hidden></div>
+<section id="panel">
+  <header>
+    <div><h1>Labyrinth 26</h1><span class="sub">Replay - 25 Oct 2026</span></div>
+    <div><b id="pclock"></b><span class="sub" id="pmeta"></span></div>
+  </header>
+  <div id="lb"></div>
+  <p id="feedhead"></p>
+  <ol id="feedlist"></ol>
+</section>
+<div id="controls">
+  <button id="play">Pause</button>
+  <button id="phonebtn" disabled title="Follow a team first: click it on the leaderboard">Show phone</button>
+  <select id="speed">
+    <option value="15">15×</option><option value="30">30×</option><option value="60" selected>60×</option><option value="120">120×</option><option value="240">240×</option>
+  </select>
+  <input id="scrub" type="range" min="0" max="1000" value="0">
+  <span id="clocklabel"></span>
+</div>
+<script src="timeline.js"></script>
+<script>
+"use strict";
+// Replays Labyrinth 26 (25 Oct 2026) from timeline.js, built by
+// build_timeline.py from the database export and the backend log.
+const T = window.TIMELINE;
+const W = 1920, H = 1080;
+const MAP_W = 1168, MAP_H = 1346, S = H / MAP_H, MAP_PX = Math.round(MAP_W * S); // map drawn 937 x 1080
+const IST = 5.5 * 3600e3;
+const cv = document.getElementById("stage"), g = cv.getContext("2d");
+g.imageSmoothingEnabled = false;
+
+const img = (src) => { const i = new Image(); i.src = src; return i; };
+const MAP = img("assets/map.webp");
+const SPR = { coins: img("assets/coins.png"), glow: img("assets/glow.png"), pulse: img("assets/glow_pulse.png") };
+const BOSS = T.bosses.map((b) => img(`assets/bosses/${b.serial}.png`));
+const PWR = { damage_multiplier: "damage_multiplier_64", heart: "gain_a_life_64", short_qr_cooldown: "short_cooldown_64", instant_cast: "instant_cast_64" };
+const PWR_IMG = Object.fromEntries(Object.entries(PWR).map(([k, f]) => [k, img(`assets/powerups/${f}.png`)]));
+const PWR_NAME = { damage_multiplier: "Damage x2", heart: "Extra life", short_qr_cooldown: "Short cooldown", instant_cast: "Instant cast" };
+// Sprite sheets (MapIcons/*.json): frame i at x = startX + i × stride.
+const SHEET = {
+  coins: { startX: 40, stride: 234, w: 214, h: 253, n: 10 },
+  glow: { startX: 40, stride: 656, w: 636, h: 767, n: 6 },
+  pulse: { startX: 40, stride: 236, w: 216, h: 262, n: 8 },
+};
+
+const team = Object.fromEntries(T.teams.map((t, i) => [t.id, { ...t, idx: i }]));
+const WP = T.waypoints;
+const mp = (wp) => [WP[wp].x * S, WP[wp].y * S];
+const clock = (t) => new Date(t + IST).toISOString().slice(11, 19);
+const ease = (x) => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3);
+
+// ---- state, rebuilt by applying events in order ----
+let st, applied;
+// focus: the team clicked on the leaderboard (only its game is shown), or
+// null for everyone. rowHits: where each row was last drawn, for clicks.
+let focus = null, rowHits = [];
+// phoneOn: whether the followed team's phone is shown (the Show phone button).
+let phoneOn = false;
+// mobile: the phone layout (layout()), whose map is shown smaller, so its
+// labels and markers are drawn K times larger.
+let mobile = false;
+const K = () => (mobile ? 1.8 : 1);
+const shown = (tm) => !focus || !tm || tm.id === focus;
+function reset() {
+  applied = 0;
+  st = { teams: {}, feed: [], casts: [], scans: [], banners: [], quiz: null, deleted: 0 };
+}
+function teamState(id) {
+  return st.teams[id] ??= { defeated: 0, damage: 0, health: T.rules.health, lastDefeat: 0, attempt: [], lastWp: null,
+    held: new Set(), casts: 0, scans: 0, started: false, y: null, hit: -1e15, lastScan: -1e15 };
+}
+function feed(t, tm, text, tone) { st.feed.push({ t, tm, text, tone }); }
+function banner(t, title, sub, color, tm = null) { st.banners.push({ t, title, sub, color, tm }); }
+
+function apply(e) {
+  const s = e.team ? teamState(e.team) : null, tm = e.team ? team[e.team] : null;
+  switch (e.type) {
+    case "start":
+      s.started = true; feed(e.t, tm, "entered the labyrinth", "info"); break;
+    case "scan":
+      s.scans++; s.lastWp = e.wp; s.lastScan = e.t; s.attempt.push({ wp: e.wp, wrong: e.wrong });
+      st.scans.push({ t: e.t, wp: e.wp, tm, wrong: e.wrong });
+      if (e.wrong) feed(e.t, tm, `wrong scan at ${WP[e.wp].name}`, "bad");
+      break;
+    case "cast": {
+      s.casts++; s.attempt = [];
+      st.casts.push({ t: e.t, wps: e.wps, tm, defeated: e.defeated });
+      const tags = [e.instant && "instant", e.boosted && "x2"].filter(Boolean).join(", ");
+      if (e.boss) {
+        s.damage += e.dealt; s.hit = e.t;
+        if (e.defeated) {
+          s.defeated++; s.damage = 0; s.lastDefeat = e.t;
+          const boss = T.bosses[e.boss - 1];
+          feed(e.t, tm, `defeated ${boss.name}${tags ? ` (${tags})` : ""}`, "good");
+          banner(e.t, s.defeated === T.bosses.length ? `${tm.name} beat the game!` : `${tm.name} defeated ${boss.name}`,
+            s.defeated === T.bosses.length ? `all ${T.bosses.length} bosses down` : `boss ${e.boss} of ${T.bosses.length} - ${e.shape} for ${e.dealt}`, tm.color, tm);
+        } else feed(e.t, tm, `${e.shape} for ${e.dealt}${tags ? ` (${tags})` : ""}`, "cast");
+      }
+      break;
+    }
+    case "attack": s.health = e.health; s.hurt = e.t; break;
+    case "knockout":
+      s.health = 0; s.hurt = e.t; feed(e.t, tm, `knocked out by ${T.bosses[e.boss - 1].name}`, "bad");
+      banner(e.t, `${tm.name} knocked out`, `by ${T.bosses[e.boss - 1].name}`, "#ff4d4d", tm); break;
+    case "heal": s.health = e.health; feed(e.t, tm, `used an extra life: health ${e.health}`, "good"); break;
+    case "revive": s.health = T.rules.health; feed(e.t, tm, "revived by an organiser", "good"); break;
+    case "powerup":
+      s.held.delete(e.kind); if (e.kind !== "heart") feed(e.t, tm, `used ${PWR_NAME[e.kind]}`, "info"); break;
+    case "quiz":
+      st.quiz = e; feed(e.t, null, `QUIZ: ${e.question}`, "quiz"); banner(e.t, "Quiz!", e.question, "#f9f3a3"); break;
+    case "answer":
+      if (e.granted) { s.held.add(e.powerup); feed(e.t, tm, `answered right: won ${PWR_NAME[e.powerup]}`, "good"); }
+      else if (!e.correct) feed(e.t, tm, "answered the quiz wrong", "bad");
+      break;
+    case "deleted": st.deleted++; break;
+  }
+}
+function advance(t) {
+  if (applied > 0 && T.events[applied - 1].t > t) reset();
+  while (applied < T.events.length && T.events[applied].t <= t) apply(T.events[applied++]);
+}
+
+// The leaderboard's rules: bosses defeated, earlier last defeat, damage, team ID.
+function ranking() {
+  return T.teams.filter((t) => st.teams[t.id]?.started).sort((a, b) => {
+    const x = st.teams[a.id], y = st.teams[b.id];
+    if (x.defeated !== y.defeated) return y.defeated - x.defeated;
+    if (x.lastDefeat !== y.lastDefeat) return !x.lastDefeat ? 1 : !y.lastDefeat ? -1 : x.lastDefeat - y.lastDefeat;
+    if (x.damage !== y.damage) return y.damage - x.damage;
+    return a.id < b.id ? -1 : 1;
+  });
+}
+
+// ---- drawing ----
+function sprite(name, frame, cx, cy, h, alpha = 1) {
+  const sh = SHEET[name], k = h / sh.h, w = sh.w * k;
+  g.globalAlpha = alpha;
+  g.drawImage(SPR[name], sh.startX + (frame % sh.n) * sh.stride, 0, sh.w, sh.h, cx - w / 2, cy - h / 2, w, h);
+  g.globalAlpha = 1;
+}
+function text(s, x, y, size, color, font = "kongtext", align = "left") {
+  g.font = `${size}px ${font}`; g.fillStyle = color; g.textAlign = align; g.textBaseline = "middle"; g.fillText(s, x, y);
+}
+function fit(s, size, max, font = "kongtext") {
+  g.font = `${size}px ${font}`;
+  while (g.measureText(s).width > max && s.includes("**")) s = s.replace("*", ""); // masked names lose asterisks first
+  if (g.measureText(s).width <= max) return s;
+  while (s.length > 1 && g.measureText(s + "…").width > max) s = s.slice(0, -1);
+  return s + "…";
+}
+function outline(wps) { // the shape through its points, by angle round their centre (as the game draws it)
+  const pts = wps.map(mp), cx = pts.reduce((a, p) => a + p[0], 0) / pts.length, cy = pts.reduce((a, p) => a + p[1], 0) / pts.length;
+  return pts.sort((a, b) => Math.atan2(a[1] - cy, a[0] - cx) - Math.atan2(b[1] - cy, b[0] - cx));
+}
+function glowPath(pts, color, alpha, closed) {
+  for (const [w, a] of [[14, 0.18], [8, 0.4], [3.5, 1]]) {
+    g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+    if (closed && pts.length > 2) g.closePath();
+    g.strokeStyle = a === 1 ? "#f7f8f8" : color; g.globalAlpha = alpha * a; g.lineWidth = w; g.lineCap = g.lineJoin = "round"; g.stroke();
+    if (a === 1) { g.strokeStyle = color; g.globalAlpha = alpha * 0.55; g.stroke(); }
+  }
+  g.globalAlpha = 1;
+}
+
+function drawMap(t, speed, frame) {
+  g.drawImage(MAP, 0, 0, MAP_PX, H);
+  g.fillStyle = "rgba(5,8,15,0.28)"; g.fillRect(0, 0, MAP_PX, H);
+  const real = (ms) => ms * speed; // a duration in real ms as game ms
+  // Casts: the shape lights up, then fades over 3 real seconds.
+  for (const c of st.casts) {
+    const age = (t - c.t) / real(3000);
+    if (age < 0 || age > 1 || !shown(c.tm)) continue;
+    glowPath(outline(c.wps), c.tm.color, 1 - age, true);
+    if (age < 0.35) for (const wp of c.wps) { const [x, y] = mp(wp); sprite("glow", Math.floor(age / 0.35 * 6), x, y - 10, c.defeated ? 150 : 110, 1); }
+  }
+  // Each team's attempt so far: the path through its scanned points,
+  // fading over 4 real seconds after its last scan.
+  for (const id in st.teams) {
+    const s = st.teams[id], age = (t - s.lastScan) / real(4000);
+    if (s.attempt.length > 1 && age < 1 && shown(team[id])) glowPath(s.attempt.map((a) => mp(a.wp)), team[id].color, 0.7 * (1 - age), false);
+  }
+  // Waypoints: a spinning coin, its name.
+  const k = K();
+  for (const wp in WP) {
+    const [x, y] = mp(wp);
+    sprite("coins", Math.floor(frame / 3), x, y, 34 * k);
+    g.font = `${11 * k}px kongtext`; const w = g.measureText(WP[wp].name).width;
+    g.fillStyle = "rgba(0,0,0,0.65)"; g.fillRect(Math.min(MAP_PX - w - 10, Math.max(4, x - w / 2 - 5)), y + 22 * k, w + 10, 17 * k);
+    text(WP[wp].name, Math.min(MAP_PX - w - 5, Math.max(9, x - w / 2)), y + 31 * k, 11 * k, "#f3f3f3");
+  }
+  // Scans: a ring in the team's colour, and a pulse.
+  for (const sc of st.scans) {
+    const age = (t - sc.t) / real(1500);
+    if (age < 0 || age > 1 || !shown(sc.tm)) continue;
+    const [x, y] = mp(sc.wp);
+    g.beginPath(); g.arc(x, y, (16 + 40 * ease(age)) * k, 0, Math.PI * 2);
+    g.strokeStyle = sc.wrong ? "#ff3b3b" : sc.tm.color; g.globalAlpha = 1 - age; g.lineWidth = 5 * k; g.stroke(); g.globalAlpha = 1;
+    sprite("pulse", Math.floor(age * 8), x, y, 54 * k, 1 - age);
+  }
+  if (st.scans.length > 400) st.scans = st.scans.filter((s) => t - s.t < real(2000));
+  // Every team: a token where it last scanned, round the point.
+  const at = {};
+  for (const tm of T.teams) { const s = st.teams[tm.id]; if (s?.started && s.lastWp && shown(tm)) (at[s.lastWp] ??= []).push(tm); }
+  for (const wp in at) {
+    const [x, y] = mp(wp), list = at[wp];
+    list.forEach((tm, i) => {
+      const a = -Math.PI / 2 + (i / list.length) * Math.PI * 2, r = (list.length === 1 ? 0 : 30) * k;
+      const px = x + Math.cos(a) * (r + 18 * k), py = y - 26 * k + Math.sin(a) * (r * 0.8);
+      const ko = st.teams[tm.id].health <= 0 && st.teams[tm.id].defeated < T.bosses.length;
+      g.beginPath(); g.arc(px, py, 9 * k, 0, Math.PI * 2);
+      g.fillStyle = ko ? "#555" : tm.color; g.fill(); g.lineWidth = 2.5 * k; g.strokeStyle = "#0b0d12"; g.stroke();
+    });
+  }
+}
+
+function drawPanel(t, speed) {
+  const X = MAP_PX + 24, PW = W - X - 24;
+  g.fillStyle = "#0b0d12"; g.fillRect(MAP_PX, 0, W - MAP_PX, H);
+  // Header: title, clock.
+  text("LABYRINTH 26", X, 42, 40, "#f9f3a3", "superfly");
+  text("REPLAY  25 OCT 2026", X + 2, 80, 12, "#8a90a2");
+  text(clock(t), X + PW, 46, 34, "#f3f3f3", "kongtext", "right");
+  const el = Math.max(0, t - T.start), hh = Math.floor(el / 3600e3), mm = Math.floor(el / 60e3) % 60;
+  text(`IST  +${hh}h${String(mm).padStart(2, "0")}m  ${speed}x speed`, X + PW, 80, 12, "#8a90a2", "kongtext", "right");
+
+  // Leaderboard.
+  const top = 108, rowH = 44, ranked = ranking();
+  rowHits = [];
+  text("#", X, top + 10, 10, "#6b7286"); text("TEAM", X + 64, top + 10, 10, "#6b7286");
+  text("BOSSES", X + 380, top + 10, 10, "#6b7286"); text("FIGHTING", X + 548, top + 10, 10, "#6b7286"); text("HEALTH", X + 760, top + 10, 10, "#6b7286");
+  ranked.forEach((tm, i) => {
+    const s = st.teams[tm.id], want = top + 26 + i * rowH;
+    s.y = s.y == null ? want : s.y + (want - s.y) * 0.18;
+    const y = s.y, done = s.defeated >= T.bosses.length, ko = s.health <= 0 && !done;
+    rowHits.push({ id: tm.id, y0: y, y1: y + rowH - 4 });
+    g.globalAlpha = shown(tm) ? 1 : 0.3;
+    g.fillStyle = i % 2 ? "#10131b" : "#141824"; g.fillRect(X - 8, y, PW + 16, rowH - 4);
+    if (focus === tm.id) { g.strokeStyle = tm.color; g.lineWidth = 3; g.strokeRect(X - 7, y + 1, PW + 14, rowH - 6); }
+    if (t - (s.hurt ?? -1e15) < speed * 600) { g.fillStyle = `rgba(255,60,60,${0.35 * (1 - (t - s.hurt) / (speed * 600))})`; g.fillRect(X - 8, y, PW + 16, rowH - 4); }
+    const cy = y + (rowH - 4) / 2;
+    text(String(i + 1), X, cy, 14, i < 3 ? "#f9f3a3" : "#8a90a2");
+    g.fillStyle = tm.color; g.fillRect(X + 34, cy - 9, 18, 18);
+    text(fit(tm.name, 13, 300), X + 64, cy, 13, ko ? "#7a7f8c" : "#f3f3f3");
+    for (let b = 0; b < T.bosses.length; b++) { // a pip per boss
+      g.fillStyle = b < s.defeated ? tm.color : "#2a3040"; g.fillRect(X + 380 + b * 24, cy - 8, 18, 16);
+    }
+    if (done) text("FINISHED", X + 548, cy, 12, "#7fe07f");
+    else {
+      const boss = T.bosses[s.defeated], bi = BOSS[s.defeated];
+      const shake = t - s.hit < speed * 250 ? Math.sin(t / 20) * 2 : 0;
+      g.drawImage(bi, X + 548 + shake, cy - 19, 30, 38);
+      g.fillStyle = "#2a3040"; g.fillRect(X + 586, cy + 2, 150, 8);
+      g.fillStyle = "#e84855"; g.fillRect(X + 586, cy + 2, 150 * (1 - s.damage / boss.hp), 8);
+      text(fit(boss.name, 10, 150), X + 586, cy - 8, 10, "#c9ccd6");
+    }
+    if (ko) { g.fillStyle = "#e84855"; g.fillRect(X + 760, cy - 10, 44, 20); text("KO", X + 782, cy + 1, 11, "#fff", "kongtext", "center"); }
+    else for (let h = 0; h < T.rules.health; h++) { g.fillStyle = h < s.health ? "#ff6b81" : "#2a3040"; g.fillRect(X + 760 + h * 13, cy - 6, 10, 12); }
+    let px = X + 900; for (const k of s.held) { g.drawImage(PWR_IMG[k], px - (s.held.size - 1) * 24, cy - 11, 22, 22); px += 24; }
+    g.globalAlpha = 1;
+  });
+
+  // Feed.
+  const fy = top + 26 + 15 * rowH + 18;
+  const ft = focus && team[focus];
+  text(ft ? `LIVE - ${ft.name.toUpperCase()} ONLY` : "LIVE  (CLICK A TEAM TO FOLLOW IT)", X, fy, 11, ft ? ft.color : "#6b7286");
+  if (ft) {
+    text(phoneOn ? "Esc close" : "P phone    Esc everyone", X + PW, fy, 10, "#6b7286", "kongtext", "right");
+  }
+  const rows = 6, first = fy + 24;
+  const tone = { good: "#7fe07f", bad: "#ff6b6b", cast: "#c9ccd6", info: "#8a90a2", quiz: "#f9f3a3" };
+  st.feed.filter((f) => shown(f.tm)).slice(-rows).reverse().forEach((f, i) => {
+    const y = first + i * 22, a = Math.min(1, 0.25 + (t - f.t) / (speed * 300));
+    g.globalAlpha = a * (1 - i * 0.08);
+    text(clock(f.t).slice(0, 5), X, y, 10, "#6b7286");
+    if (f.tm) { g.fillStyle = f.tm.color; g.fillRect(X + 64, y - 6, 12, 12); text(fit(f.tm.name, 11, 190), X + 84, y, 11, "#f3f3f3"); }
+    text(fit(f.text, 11, f.tm ? PW - 290 : PW - 70), f.tm ? X + 290 : X + 64, y, 11, tone[f.tone]);
+    g.globalAlpha = 1;
+  });
+
+  // Activity: requests a minute (backend log), the playhead, quizzes.
+  const ay = H - 70, ah = 50, ax = X, aw = PW, t0 = T.start - 10 * 60e3, t1 = T.end;
+  const maxv = Math.max(...T.activity.map((a) => a[1]));
+  g.fillStyle = "#141824"; g.fillRect(ax - 8, ay - 22, aw + 16, ah + 30);
+  text("REQUESTS A MINUTE", ax, ay - 12, 9, "#6b7286");
+  for (const [m, v] of T.activity) {
+    const x = ax + ((m - t0) / (t1 - t0)) * aw, bh = (v / maxv) * ah;
+    g.fillStyle = m <= t ? "#4cc9f0" : "#27406a"; g.fillRect(x, ay + ah - bh + 4, Math.max(1.5, aw / ((t1 - t0) / 60e3) - 1), bh);
+  }
+  for (const e of T.events) if (e.type === "quiz") { const x = ax + ((e.t - t0) / (t1 - t0)) * aw; g.fillStyle = "#f9f3a3"; g.fillRect(x, ay - 4, 2, ah + 8); }
+  const px = ax + ((t - t0) / (t1 - t0)) * aw; g.fillStyle = "#fff"; g.fillRect(px - 1, ay - 6, 3, ah + 12);
+}
+
+function drawBanners(t, speed) {
+  st.banners = st.banners.filter((b) => t - b.t < speed * 2600);
+  const b = st.banners.filter((b) => shown(b.tm)).pop();
+  if (!b) return;
+  const age = (t - b.t) / (speed * 2600), a = age < 0.12 ? age / 0.12 : age > 0.8 ? (1 - age) / 0.2 : 1, k = K();
+  g.globalAlpha = a;
+  g.fillStyle = "rgba(8,10,16,0.86)"; g.fillRect(40, H / 2 - 70 * k, MAP_PX - 80, 140 * k);
+  g.fillStyle = b.color; g.fillRect(40, H / 2 - 70 * k, 8, 140 * k);
+  text(fit(b.title, 30 * k, MAP_PX - 140, "superfly"), MAP_PX / 2, H / 2 - 18 * k, 30 * k, b.color, "superfly", "center");
+  text(fit(b.sub, 13 * k, MAP_PX - 140), MAP_PX / 2, H / 2 + 30 * k, 13 * k, "#e6e6e6", "kongtext", "center");
+  g.globalAlpha = 1;
+}
+
+// The phone layout's panel: drawPanel's leaderboard and feed as HTML. A row
+// per team, kept and reordered so taps land; put() only touches the DOM when
+// something changed.
+const $id = (id) => document.getElementById(id);
+const esc = (v) => String(v).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const put = (el, html) => { if (el._html !== html) { el._html = html; el.innerHTML = html; } };
+// A masked name ("D*********t") in a box too narrow for it loses asterisks
+// until it fits, the way fit() does on the canvas. Redone when its box changes size.
+function squeeze(el, name) {
+  const key = `${name}|${innerWidth}|${el.clientWidth}`;
+  if (el._squeezed === key) return;
+  el._squeezed = key; el.textContent = name;
+  while (el.scrollWidth > el.clientWidth && el.textContent.includes("**")) el.textContent = el.textContent.replace("*", "");
+}
+const rowEls = {};
+function rowEl(tm) {
+  if (rowEls[tm.id]) return rowEls[tm.id];
+  const r = document.createElement("button");
+  r.type = "button"; r.className = "row"; r.style.setProperty("--c", tm.color);
+  r.innerHTML = `<span class="rank"></span><span class="sw"></span><span class="name"></span><span class="hp"></span><span class="boss"></span>`;
+  r.onclick = () => follow(tm.id);
+  return (rowEls[tm.id] = r);
+}
+function drawHtml(t, speed) {
+  $id("pclock").textContent = clock(t);
+  const el = Math.max(0, t - T.start);
+  $id("pmeta").textContent = `IST  +${Math.floor(el / 3600e3)}h${String(Math.floor(el / 60e3) % 60).padStart(2, "0")}m  ${speed}x`;
+  const lb = $id("lb"), ranked = ranking();
+  ranked.forEach((tm, i) => {
+    const s = st.teams[tm.id], r = rowEl(tm), done = s.defeated >= T.bosses.length, ko = s.health <= 0 && !done;
+    if (lb.children[i] !== r) lb.insertBefore(r, lb.children[i] ?? null);
+    r.classList.toggle("focus", focus === tm.id); r.classList.toggle("dim", !shown(tm));
+    r.classList.toggle("hurt", t - (s.hurt ?? -1e15) < speed * 600); r.classList.toggle("out", ko);
+    put(r.children[0], String(i + 1)); squeeze(r.children[2], tm.name);
+    put(r.children[3], ko ? `<span class="ko">KO</span>` : Array.from({ length: T.rules.health }, (_, h) => `<i class="${h < s.health ? "on" : ""}"></i>`).join(""));
+    const boss = T.bosses[s.defeated];
+    put(r.children[4], `<span class="pips">${T.bosses.map((_, b) => `<i class="${b < s.defeated ? "on" : ""}"></i>`).join("")}</span>` +
+      (done ? `<span class="fin">FINISHED</span>`
+        : `<img src="assets/bosses/${boss.serial}.png" alt=""><span class="bname">${esc(boss.name)}</span><span class="bar"><b style="width:${100 * (1 - s.damage / boss.hp)}%"></b></span>`) +
+      `<span class="pw">${[...s.held].map((k) => `<img src="assets/powerups/${PWR[k]}.png" alt="${esc(PWR_NAME[k])}">`).join("")}</span>`);
+  });
+  while (lb.children.length > ranked.length) lb.lastChild.remove(); // after scrubbing back
+  const ft = focus && team[focus];
+  $id("feedhead").classList.toggle("on", !!ft);
+  put($id("feedhead"), ft ? `<span>FOLLOWING</span><span class="chip" style="--c:${ft.color}"><i></i><span class="name"></span></span><button type="button" class="all">Show all</button>`
+    : "<span>LIVE - tap a team to follow it</span>");
+  if (ft) squeeze($id("feedhead").querySelector(".name"), ft.name);
+  put($id("feedlist"), st.feed.filter((f) => shown(f.tm)).slice(-30).reverse().map((f) =>
+    `<li><time>${clock(f.t).slice(0, 5)}</time><span class="${f.tone}">${f.tm ? `<span class="who" style="--c:${f.tm.color}"><i></i>${esc(f.tm.name)}</span>` : ""}${esc(f.text)}</span></li>`).join(""));
+}
+
+let frameNo = 0;
+function render(t, speed) {
+  advance(t);
+  drawMap(t, speed, frameNo);
+  if (mobile) drawHtml(t, speed); else drawPanel(t, speed);
+  drawBanners(t, speed);
+  Phone.render(t, speed, phoneOn ? focus : null, frameNo);
+  const open = mobile && !phoneEl.hidden;
+  scrim.hidden = !open; document.body.classList.toggle("phoneopen", open);
+  phoneBtn.disabled = !focus;
+  phoneBtn.textContent = phoneOn && focus ? "Hide phone" : "Show phone";
+  frameNo++;
+}
+
+// ---- playback ----
+reset();
+const params = new URLSearchParams(location.search);
+let speed = Number(params.get("speed") || 60), playing = true, now = T.start - 20e3, last = null;
+const playBtn = document.getElementById("play"), scrub = document.getElementById("scrub"), lbl = document.getElementById("clocklabel");
+// Links can open a moment: ?team=<id or name>&at=HH:MM[:SS] (IST)&paused=1.
+if (params.get("team")) focus = T.teams.find((t) => t.id === params.get("team") || t.name.toLowerCase() === params.get("team").toLowerCase())?.id ?? null;
+if (params.get("at")) {
+  const [h, m, sec = 0] = params.get("at").split(":").map(Number);
+  now = Date.UTC(2026, 9, 25, h, m, sec) - IST;
+}
+if (params.get("paused")) playing = false;
+if (params.get("phone")) phoneOn = true;
+document.getElementById("speed").value = String(speed);
+document.getElementById("speed").onchange = (e) => (speed = Number(e.target.value));
+playBtn.textContent = playing ? "Pause" : "Play";
+playBtn.onclick = () => { playing = !playing; playBtn.textContent = playing ? "Pause" : "Play"; };
+scrub.oninput = () => { now = T.start + (scrub.value / 1000) * (T.end - T.start); for (const s of Object.values(st.teams)) s.y = null; };
+// The stage scales to fit the window, above the controls.
+const frameEl = document.getElementById("frame"), wrapEl = document.getElementById("wrap");
+function fitStage() {
+  const k = Math.min(innerWidth / W, (innerHeight - document.getElementById("controls").offsetHeight) / H);
+  frameEl.style.width = `${W * k}px`; frameEl.style.height = `${H * k}px`; wrapEl.style.transform = `scale(${k})`;
+}
+// Phones and small tablets get the phone layout: the canvas shrinks to the
+// map, and the followed team's phone is scaled to fill the screen.
+const phoneEl = document.getElementById("phone"), scrim = document.getElementById("scrim");
+function layout() {
+  const m = innerWidth < 900 || innerHeight < 500;
+  if (m !== mobile) {
+    mobile = m; document.body.classList.toggle("mobile", m);
+    cv.width = m ? MAP_PX : W; g.imageSmoothingEnabled = false;
+  }
+  if (mobile) phoneEl.style.setProperty("--ps", Math.min(1, (innerWidth - 16) / 414, (innerHeight - 24) / 930));
+  else fitStage();
+}
+addEventListener("resize", layout); layout();
+// The controls' height, for the pinned Following bar; it changes once the font loads.
+new ResizeObserver(([e]) => document.body.style.setProperty("--ch", `${e.target.offsetHeight}px`)).observe(document.getElementById("controls"));
+// Show phone / Hide phone (or P): the followed team's phone, over the map.
+const phoneBtn = document.getElementById("phonebtn");
+const togglePhone = () => { if (focus) phoneOn = !phoneOn; };
+phoneBtn.onclick = togglePhone;
+scrim.onclick = () => (phoneOn = false);
+document.getElementById("feedhead").onclick = (ev) => { if (ev.target.closest(".all")) follow(null); };
+// Clicking a leaderboard row follows that team; again (or Esc) shows everyone.
+function follow(id) {
+  focus = id && id !== focus ? id : null;
+  if (!focus) phoneOn = false;
+}
+cv.addEventListener("click", (ev) => {
+  const r = cv.getBoundingClientRect(), x = ((ev.clientX - r.left) / r.width) * W, y = ((ev.clientY - r.top) / r.height) * H;
+  if (mobile || x < MAP_PX) return;
+  follow(rowHits.find((h) => y >= h.y0 && y <= h.y1)?.id);
+});
+cv.addEventListener("mousemove", (ev) => {
+  const r = cv.getBoundingClientRect(), x = ((ev.clientX - r.left) / r.width) * W, y = ((ev.clientY - r.top) / r.height) * H;
+  cv.style.cursor = !mobile && x >= MAP_PX && rowHits.some((h) => y >= h.y0 && y <= h.y1) ? "pointer" : "default";
+});
+addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape") { if (phoneOn) phoneOn = false; else focus = null; }
+  if (ev.key === "p" || ev.key === "P") togglePhone();
+});
+function loop(ts) {
+  if (last != null && playing) now = Math.min(T.end, now + (ts - last) * speed);
+  last = ts;
+  render(now, speed);
+  scrub.value = String(Math.round(((now - T.start) / (T.end - T.start)) * 1000));
+  lbl.textContent = `${clock(now)} IST`;
+  requestAnimationFrame(loop);
+}
+const images = [MAP, ...Object.values(SPR), ...BOSS, ...Object.values(PWR_IMG)];
+Promise.all([document.fonts.load("20px kongtext"), document.fonts.load("20px superfly"),
+  ...images.map((i) => i.decode().catch(() => {}))]).then(() => {
+  requestAnimationFrame(loop);
+});
+</script>
+<script src="phone.js"></script>
+</body>
+</html>
